@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Analytics Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --primary-color: #4e73df;
+            --text-color: #5a5c69;
+        }
+        
+        body {
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+        }
+        
+        .dashboard-container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+            padding: 1rem;
+            margin-bottom: 2rem;
+            border-radius: 10px;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            margin-bottom: 1.5rem;
+        }
+        
+        .stats-card {
+            padding: 1.5rem;
+            border-left: 4px solid;
+        }
+        
+        .stats-card.primary { border-left-color: #4e73df; }
+        .stats-card.success { border-left-color: #1cc88a; }
+        .stats-card.info { border-left-color: #36b9cc; }
+        .stats-card.warning { border-left-color: #f6c23e; }
+        
+        .stats-card .stats-icon {
+            font-size: 2rem;
+            opacity: 0.4;
+        }
+        
+        .plot-container {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            height: 100%;
+        }
+        
+        .plot-content {
+            min-height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .plot-content img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        .filters-sidebar {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 1.5rem;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .category-checkbox {
+            margin: 0.5rem 0;
+        }
+        
+        .section-title {
+            color: #4e73df;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .data-table {
+            margin-top: 1rem;
+        }
+        
+        .data-table th {
+            background-color: #4e73df;
+            color: white;
+        }
+        
+        .upload-zone {
+            border: 2px dashed #4e73df;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-zone:hover {
+            background-color: rgba(78, 115, 223, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <p>Processing document...</p>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">Event Analytics Dashboard</span>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-lg-3">
+                <div class="filters-sidebar">
+                    <!-- File Upload -->
+                    <div class="upload-zone mb-4" onclick="document.getElementById('docFile').click()">
+                        <i class='bx bx-upload' style="font-size: 2rem;"></i>
+                        <h5 class="mt-3 mb-2">Upload Document</h5>
+                        <p class="text-muted small mb-0">Click to upload DOCX file</p>
+                        <input type="file" id="docFile" accept=".docx" style="display: none;">
+                    </div>
+
+                    <!-- Filters -->
+                    <div id="filters" style="display: none;">
+                        <h5 class="section-title">Data Filters</h5>
+                        <div id="categoryCheckboxes"></div>
+                        <button class="btn btn-primary w-100 mt-4" onclick="updateVisualizations()">
+                            Update Visualizations
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-lg-9">
+                <!-- Stats Cards -->
+                <div class="row mb-4" id="statsCards" style="display: none;">
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card primary">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1">Total Events</div>
+                                    <div class="h5 mb-0 font-weight-bold" id="totalEvents">0</div>
+                                </div>
+                                <div class="stats-icon">
+                                    <i class='bx bx-calendar'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card success">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1">Total Participants</div>
+                                    <div class="h5 mb-0 font-weight-bold" id="totalParticipants">0</div>
+                                </div>
+                                <div class="stats-icon">
+                                    <i class='bx bx-group'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card info">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1">Categories</div>
+                                    <div class="h5 mb-0 font-weight-bold" id="totalCategories">0</div>
+                                </div>
+                                <div class="stats-icon">
+                                    <i class='bx bx-category'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card warning">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1">Avg. Participants/Event</div>
+                                    <div class="h5 mb-0 font-weight-bold" id="avgParticipants">0</div>
+                                </div>
+                                <div class="stats-icon">
+                                    <i class='bx bx-stats'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Summary -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="section-title">Data Summary</h5>
+                        <div id="dataTable" class="data-table"></div>
+                    </div>
+                </div>
+
+                <!-- Visualizations Grid -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="plot-container">
+                            <h5 class="section-title">Events Distribution</h5>
+                            <div class="plot-content" id="trendPlot"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="plot-container">
+                            <h5 class="section-title">Participants Distribution</h5>
+                            <div class="plot-content" id="piePlot"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="plot-container">
+                            <h5 class="section-title">Events & Participants Comparison</h5>
+                            <div class="plot-content" id="barPlot"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="plot-container">
+                            <h5 class="section-title">Category Performance</h5>
+                            <div class="plot-content" id="radarPlot"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="plot-container">
+                            <h5 class="section-title">Participation Density</h5>
+                            <div class="plot-content" id="heatmapPlot"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let globalData = null;
+
+        function showLoading() {
+            $('#loadingOverlay').css('display', 'flex');
+        }
+
+        function hideLoading() {
+            $('#loadingOverlay').css('display', 'none');
+        }
+
+        function updateStats(data) {
+            const totalEvents = data.reduce((sum, item) => sum + item.Events, 0);
+            const totalParticipants = data.reduce((sum, item) => sum + (item.Participants || 0), 0);
+            const avgParticipants = Math.round(totalParticipants / totalEvents);
+
+            $('#totalEvents').text(totalEvents.toLocaleString());
+            $('#totalParticipants').text(totalParticipants.toLocaleString());
+            $('#totalCategories').text(data.length);
+            $('#avgParticipants').text(avgParticipants.toLocaleString());
+            $('#statsCards').show();
+        }
+
+        function updateVisualizations() {
+            const selectedCategories = [];
+            $('input[name="category"]:checked').each(function() {
+                selectedCategories.push($(this).val());
+            });
+
+            if (selectedCategories.length === 0) {
+                alert('Please select at least one category');
+                return;
+            }
+
+            showLoading();
+            
+            Promise.all([
+                generatePlot('trends', selectedCategories),
+                generatePlot('bar', selectedCategories),
+                generatePlot('pie', selectedCategories),
+                generatePlot('radar', selectedCategories),
+                generatePlot('heatmap', selectedCategories)
+            ]).then(() => {
+                hideLoading();
+            }).catch(error => {
+                console.error('Error:', error);
+                hideLoading();
+                alert('Error generating visualizations');
+            });
+        }
+
+        function generatePlot(plotType, selectedCategories) {
+            return fetch('/generate_plot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    data: globalData,
+                    plot_type: plotType,
+                    selected_categories: selectedCategories
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const plotContainer = plotType === 'trends' ? '#trendPlot' : 
+                                    plotType === 'bar' ? '#barPlot' : 
+                                    plotType === 'pie' ? '#piePlot' : 
+                                    plotType === 'radar' ? '#radarPlot' : '#heatmapPlot';
+                $(plotContainer).html(`<img src="data:image/png;base64,${data.plot_url}" class="img-fluid">`);
+            });
+        }
+
+        $(document).ready(function() {
+            $('#docFile').change(function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                showLoading();
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        hideLoading();
+                        return;
+                    }
+
+                    globalData = data.data;
+                    
+                    // Create table
+                    let tableHtml = `
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Events</th>
+                                        <th>Participants</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    data.data.forEach(row => {
+                        tableHtml += `
+                            <tr>
+                                <td><strong>${row.Category}</strong></td>
+                                <td>${row.Events}</td>
+                                <td>${row.Participants ? row.Participants.toLocaleString() : '-'}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    tableHtml += '</tbody></table></div>';
+                    $('#dataTable').html(tableHtml);
+
+                    // Update filters
+                    $('#categoryCheckboxes').empty();
+                    data.categories.forEach(category => {
+                        $('#categoryCheckboxes').append(`
+                            <div class="category-checkbox">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="category" 
+                                           value="${category}" id="category-${category}" checked>
+                                    <label class="form-check-label" for="category-${category}">
+                                        ${category}
+                                    </label>
+                                </div>
+                            </div>
+                        `);
+                    });
+
+                    // Generate initial visualizations
+                    updateVisualizations();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while processing the document');
+                    hideLoading();
+                });
+            });
+        });
+    </script>
+</body>
+</html>
